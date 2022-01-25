@@ -381,13 +381,13 @@ class TestDataPipe(expecttest.TestCase):
 
     def test_line_reader_iterdatapipe(self) -> None:
         text1 = "Line1\nLine2"
-        text2 = "Line2,1\nLine2,2\nLine2,3"
+        text2 = "Line2,1\r\nLine2,2\r\nLine2,3"
 
         # Functional Test: read lines correctly
         source_dp = IterableWrapper([("file1", io.StringIO(text1)), ("file2", io.StringIO(text2))])
         line_reader_dp = source_dp.readlines()
-        expected_result = [("file1", line) for line in text1.split("\n")] + [
-            ("file2", line) for line in text2.split("\n")
+        expected_result = [("file1", line) for line in text1.splitlines()] + [
+            ("file2", line) for line in text2.splitlines()
         ]
         self.assertEqual(expected_result, list(line_reader_dp))
 
@@ -396,8 +396,8 @@ class TestDataPipe(expecttest.TestCase):
             [("file1", io.BytesIO(text1.encode("utf-8"))), ("file2", io.BytesIO(text2.encode("utf-8")))]
         )
         line_reader_dp = source_dp.readlines()
-        expected_result_bytes = [("file1", line.encode("utf-8")) for line in text1.split("\n")] + [
-            ("file2", line.encode("utf-8")) for line in text2.split("\n")
+        expected_result_bytes = [("file1", line.encode("utf-8")) for line in text1.splitlines()] + [
+            ("file2", line.encode("utf-8")) for line in text2.splitlines()
         ]
         self.assertEqual(expected_result_bytes, list(line_reader_dp))
 
@@ -407,8 +407,8 @@ class TestDataPipe(expecttest.TestCase):
         expected_result = [
             ("file1", "Line1\n"),
             ("file1", "Line2"),
-            ("file2", "Line2,1\n"),
-            ("file2", "Line2,2\n"),
+            ("file2", "Line2,1\r\n"),
+            ("file2", "Line2,2\r\n"),
             ("file2", "Line2,3"),
         ]
         self.assertEqual(expected_result, list(line_reader_dp))
@@ -520,14 +520,12 @@ class TestDataPipe(expecttest.TestCase):
         batch_dp = source_dp.bucketbatch(
             batch_size=3, drop_last=True, batch_num=100, bucket_num=1, in_batch_shuffle=True
         )
-        self.assertEqual(3, len(batch_dp))
         self.assertEqual(9, len(list(batch_dp.unbatch())))
 
         # Functional Test: drop last is False preserves length
         batch_dp = source_dp.bucketbatch(
             batch_size=3, drop_last=False, batch_num=100, bucket_num=1, in_batch_shuffle=False
         )
-        self.assertEqual(4, len(batch_dp))
         self.assertEqual(10, len(list(batch_dp.unbatch())))
 
         def _return_self(x):
@@ -539,14 +537,12 @@ class TestDataPipe(expecttest.TestCase):
         )
         # bucket_num = 1 means there will be no shuffling if a sort key is given
         self.assertEqual([[0, 1, 2], [3, 4, 5], [6, 7, 8]], list(batch_dp))
-        self.assertEqual(3, len(batch_dp))
         self.assertEqual(9, len(list(batch_dp.unbatch())))
 
         # Functional Test: using sort_key, without in_batch_shuffle
         batch_dp = source_dp.bucketbatch(
             batch_size=3, drop_last=True, batch_num=100, bucket_num=2, in_batch_shuffle=False, sort_key=_return_self
         )
-        self.assertEqual(3, len(batch_dp))
         self.assertEqual(9, len(list(batch_dp.unbatch())))
 
         # Reset Test:
@@ -567,7 +563,8 @@ class TestDataPipe(expecttest.TestCase):
         self.assertEqual(9, len([item for batch in res_after_reset for item in batch]))
 
         # __len__ Test: returns the number of batches
-        self.assertEqual(3, len(batch_dp))
+        with self.assertRaises(TypeError):
+            len(batch_dp)
 
 
 if __name__ == "__main__":
